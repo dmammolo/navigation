@@ -54,6 +54,7 @@ generate_messages(
 generate_dynamic_reconfigure_options(
   cfg/Costmap2D.cfg
   cfg/ObstaclePlugin.cfg
+  cfg/MultirobotObstaclePlugin.cfg
   cfg/GenericPlugin.cfg
   cfg/InflationPlugin.cfg
   cfg/VoxelPlugin.cfg
@@ -107,6 +108,7 @@ target_link_libraries(costmap_2d
 add_library(layers
   plugins/inflation_layer.cpp
   plugins/obstacle_layer.cpp
+  plugins/multirobot_obstacle_layer.cpp
   plugins/static_layer.cpp
   plugins/voxel_layer.cpp
   src/observation_buffer.cpp
