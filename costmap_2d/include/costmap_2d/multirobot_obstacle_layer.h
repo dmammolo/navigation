@@ -53,14 +53,56 @@
 
 namespace costmap_2d
 {
+/**
+ * @class CellData
+ * @brief Storage for cell information used during obstacle inflation
+ */
+class CellData
+{
+public:
+  /**
+   * @brief  Constructor for a CellData objects
+   * @param  i The index of the cell in the cost map
+   * @param  x The x coordinate of the cell in the cost map
+   * @param  y The y coordinate of the cell in the cost map
+   * @param  sx The x coordinate of the closest obstacle cell in the costmap
+   * @param  sy The y coordinate of the closest obstacle cell in the costmap
+   * @return
+   */
+  CellData(double i, unsigned int x, unsigned int y, unsigned int sx, unsigned int sy) :
+      index_(i), x_(x), y_(y), src_x_(sx), src_y_(sy)
+  {
+  }
+  unsigned int index_;
+  unsigned int x_, y_;
+  unsigned int src_x_, src_y_;
+};
+
+/**
+ * @class CellData
+ * @brief Storage for cell information used during obstacle inflation
+ */
+class CellInfo
+{
+public:
+  /**
+   * @brief  Constructor for a CellInfo objects
+   * @param  cost The current cost is saved for later use
+   * @param  cell_data The cell data
+   * @return
+   */
+  CellInfo(unsigned int cost, CellData cell_data) :
+      prev_cost_(cost), cell_data_(cell_data)
+  {
+  }
+  unsigned int prev_cost_;
+  CellData cell_data_;
+};
 
 class MultirobotObstacleLayer : public CostmapLayer
 {
 public:
-  MultirobotObstacleLayer()
-  {
-    costmap_ = NULL;  // this is the unsigned char* member of parent class Costmap2D.
-  }
+  MultirobotObstacleLayer();
 
   virtual ~MultirobotObstacleLayer();
   virtual void onInitialize();
@@ -69,6 +111,14 @@ public:
   virtual void updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, int min_j, int max_i, int max_j);
 
   virtual void reset();
+
+  virtual void matchSize();
+
+  /**
+   * @brief Change the values of the robot radius parameters
+   * @param robot_radius The other robot radius
+   */
+  void setInflationParameters(double robot_radius_);
 
 protected:
   virtual void setupDynamicReconfigure(ros::NodeHandle& nh);
@@ -90,8 +140,51 @@ protected:
   std::vector<std::vector<int> > prev_robot_cells_rolling_;
   std::vector<std::vector<int> > prev_robot_cells_;
 
+  boost::recursive_mutex* inflation_access_;
+
 private:
   void reconfigureCB(costmap_2d::MultirobotObstaclePluginConfig &config, uint32_t level);
+
+  /**
+   * @brief  Lookup pre-computed distances
+   * @param mx The x coordinate of the current cell
+   * @param my The y coordinate of the current cell
+   * @param src_x The x coordinate of the source cell
+   * @param src_y The y coordinate of the source cell
+   * @return
+   */
+  inline double distanceLookup(int mx, int my, int src_x, int src_y)
+  {
+    unsigned int dx = abs(mx - src_x);
+    unsigned int dy = abs(my - src_y);
+    return cached_distances_[dx][dy];
+  }
+
+  void computeCaches();
+  void deleteKernels();
+
+  unsigned int cellDistance(double world_dist)
+  {
+    return layered_costmap_->getCostmap()->cellDistance(world_dist);
+  }
+
+  inline void enqueue(unsigned int index, unsigned int mx, unsigned int my,
+                      unsigned int src_x, unsigned int src_y);
+
+  double robot_radius_;
+  unsigned int cell_robot_radius_;
+  unsigned int cached_cell_robot_radius_;
+  std::map<double, std::vector<CellInfo> > inflation_cells_;
+  std::map<double, std::vector<CellInfo> > inflation_cells_rolling_;
+
+  bool* seen_;
+  int seen_size_;
+
+  // unsigned char** cached_costs_;
+  double** cached_distances_;
+  double last_min_x_, last_min_y_, last_max_x_, last_max_y_;
+
+  bool need_reinflation_;  ///< Indicates that the entire costmap should be reinflated next time around.
 };
 
 }  // namespace costmap_2d
