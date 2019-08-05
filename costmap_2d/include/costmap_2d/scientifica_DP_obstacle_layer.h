@@ -69,12 +69,19 @@ public:
 
   virtual void matchSize();
 
+  bool checkIfInStagingRegion(double &x, double &y);
+
+  void setLethal(costmap_2d::Costmap2D& master_grid, unsigned char* costmap_array,
+                 double &x, double &y);
+
+  void setLethal(costmap_2d::Costmap2D& master_grid, unsigned char* costmap_array,
+                 double &x, double &y, tf::Vector3 &vec);
+
   /**
    * @brief Change the values of the robot radius parameters
    * @param robot_radius The other robot radius
    */
-  void setParameters(double DP_min_x, double DP_min_y, double DP_max_x, double DP_max_y,
-                     double add_obs_min_x, double add_obs_min_y, double add_obs_max_x, double add_obs_max_y);
+  void setParameters(costmap_2d::ScientificaDPObstaclePluginConfig &config);
 
 protected:
   virtual void setupDynamicReconfigure(ros::NodeHandle& nh);
@@ -93,6 +100,7 @@ private:
 
   double DP_min_x_, DP_min_y_, DP_max_x_, DP_max_y_;
   double add_obs_min_x_, add_obs_min_y_, add_obs_max_x_, add_obs_max_y_;
+  double staging_min_x_, staging_min_y_, staging_max_x_, staging_max_y_;
 };
 
 }  // namespace costmap_2d

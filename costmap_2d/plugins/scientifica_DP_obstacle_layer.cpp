@@ -113,8 +113,7 @@ ScientificaDPObstacleLayer::~ScientificaDPObstacleLayer()
 
 void ScientificaDPObstacleLayer::reconfigureCB(costmap_2d::ScientificaDPObstaclePluginConfig &config, uint32_t level)
 {
-  setParameters(config.DP_min_x, config.DP_min_y, config.DP_max_x, config.DP_max_y,
-                config.add_obs_min_x, config.add_obs_min_y, config.add_obs_max_x, config.add_obs_max_y);
+  setParameters(config);
   combination_method_ = config.combination_method;
 
   if (enabled_ != config.enabled) {
@@ -170,63 +169,41 @@ void ScientificaDPObstacleLayer::updateCosts(costmap_2d::Costmap2D& master_grid,
   // Set lethal for horizontal obstacles
   for (double x_iter = DP_min_x_; x_iter < DP_max_x_; x_iter += resolution_)
   {
-    unsigned int mx_min, my_min;
-    unsigned int mx_max, my_max;
-    unsigned int index_min;
-    unsigned int index_max;
-
     if(!rolling_window_)
     {
-      // Necessary to compute in two if conditions, otherwhise function not working
-      if (!worldToMap(x_iter, DP_min_y_, mx_min, my_min))
+      // Set border region of DP as LETHAL
+      setLethal(master_grid, costmap_array, x_iter, DP_min_y_);
+      setLethal(master_grid, costmap_array, x_iter, DP_max_y_);
+
+      // Set additional obstacle region of DP as LETHAL
+      if (x_iter <= add_obs_max_x_ && x_iter >= add_obs_min_x_)
       {
-        ROS_DEBUG("Computing map coords failed");
-        continue;
+        setLethal(master_grid, costmap_array, x_iter, add_obs_min_y_);
+        setLethal(master_grid, costmap_array, x_iter, add_obs_max_y_);
       }
-
-      // Set lethal
-      index_min = master_grid.getIndex(mx_min, my_min);
-      costmap_array[index_min] = LETHAL_OBSTACLE;
-
-      if (!worldToMap(x_iter, DP_max_y_, mx_max, my_max))
-      {
-        ROS_DEBUG("Computing map coords failed");
-        continue;
-      }
-
-      // Set lethal
-      index_max = master_grid.getIndex(mx_max, my_max);
-      costmap_array[index_max] = LETHAL_OBSTACLE;
     }
     else
     {
       tf::Vector3 temp_vector_min;
       tf::Vector3 temp_vector_max;
+
+      // Set border region of DP as LETHAL
       // Transform to rolling window frame
       temp_vector_min = transform * tf::Vector3(x_iter, DP_min_y_, 0.0);
       temp_vector_max = transform * tf::Vector3(x_iter, DP_max_y_, 0.0);
 
-      // Necessary to compute in two if conditions, otherwhise function not working
-      if (!worldToMap(temp_vector_min.getX(), temp_vector_min.getY(), mx_min, my_min))
-      {
-        ROS_DEBUG("Computing map coords failed");
-      }
-      else
-      {
-        // Set lethal
-        index_min = master_grid.getIndex(mx_min, my_min);
-        costmap_array[index_min] = LETHAL_OBSTACLE;
-      }
+      setLethal(master_grid, costmap_array, x_iter, DP_min_y_, temp_vector_min);
+      setLethal(master_grid, costmap_array, x_iter, DP_max_y_, temp_vector_max);
 
-      if (!worldToMap(temp_vector_max.getX(), temp_vector_max.getY(), mx_max, my_max))
+      // Set additional obstacle region of DP as LETHAL
+      if (x_iter <= add_obs_max_x_ && x_iter >= add_obs_min_x_)
       {
-        ROS_DEBUG("Computing map coords failed");
-      }
-      else
-      {
-        // Set lethal
-        index_max = master_grid.getIndex(mx_max, my_max);
-        costmap_array[index_max] = LETHAL_OBSTACLE;
+        // Transform to rolling window frame
+        temp_vector_min = transform * tf::Vector3(x_iter, add_obs_min_y_, 0.0);
+        temp_vector_max = transform * tf::Vector3(x_iter, add_obs_max_y_, 0.0);
+
+        setLethal(master_grid, costmap_array, x_iter, add_obs_min_y_, temp_vector_min);
+        setLethal(master_grid, costmap_array, x_iter, add_obs_max_y_, temp_vector_max);
       }
     }
   }
@@ -234,59 +211,41 @@ void ScientificaDPObstacleLayer::updateCosts(costmap_2d::Costmap2D& master_grid,
   // Set lethal for vertical obstacles
   for (double y_iter = DP_min_y_; y_iter < DP_max_y_; y_iter += resolution_)
   {
-    unsigned int mx_min, my_min;
-    unsigned int mx_max, my_max;
-    unsigned int index_min;
-    unsigned int index_max;
-
     if(!rolling_window_)
     {
-      // Necessary to compute in two if conditions, otherwhise function not working
-      if (!worldToMap(DP_min_x_, y_iter, mx_min, my_min))
+      // Set border region of DP as LETHAL
+      setLethal(master_grid, costmap_array, DP_min_x_, y_iter);
+      setLethal(master_grid, costmap_array, DP_max_x_, y_iter);
+
+      // Set additional obstacle region of DP as LETHAL
+      if (y_iter <= add_obs_max_y_ && y_iter >= add_obs_min_y_)
       {
-        ROS_DEBUG("Computing map coords failed");
-        continue;
+        setLethal(master_grid, costmap_array, add_obs_min_x_, y_iter);
+        setLethal(master_grid, costmap_array, add_obs_max_x_, y_iter);
       }
-      if (!worldToMap(DP_max_x_, y_iter, mx_max, my_max))
-      {
-        ROS_DEBUG("Computing map coords failed");
-        continue;
-      }
-      // Set lethal
-      index_min = master_grid.getIndex(mx_min, my_min);
-      index_max = master_grid.getIndex(mx_max, my_max);
-      costmap_array[index_min] = LETHAL_OBSTACLE;
-      costmap_array[index_max] = LETHAL_OBSTACLE;
     }
     else
     {
       tf::Vector3 temp_vector_min;
       tf::Vector3 temp_vector_max;
+
+      // Set border region of DP as LETHAL
       // Transform to rolling window frame
       temp_vector_min = transform * tf::Vector3(DP_min_x_, y_iter, 0.0);
       temp_vector_max = transform * tf::Vector3(DP_max_x_, y_iter, 0.0);
 
-      // Necessary to compute in two if conditions, otherwhise function not working
-      if (!worldToMap(temp_vector_min.getX(), temp_vector_min.getY(), mx_min, my_min))
-      {
-        ROS_DEBUG("Computing map coords failed");
-      }
-      else
-      {
-        // Set lethal
-        index_min = master_grid.getIndex(mx_min, my_min);
-        costmap_array[index_min] = LETHAL_OBSTACLE;
-      }
+      setLethal(master_grid, costmap_array, DP_min_x_, y_iter, temp_vector_min);
+      setLethal(master_grid, costmap_array, DP_max_x_, y_iter, temp_vector_max);
 
-      if (!worldToMap(temp_vector_max.getX(), temp_vector_max.getY(), mx_max, my_max))
+      // Set additional obstacle region of DP as LETHAL
+      if (y_iter <= add_obs_max_y_ && y_iter >= add_obs_min_y_)
       {
-        ROS_DEBUG("Computing map coords failed");
-      }
-      else
-      {
-        // Set lethal
-        index_max = master_grid.getIndex(mx_max, my_max);
-        costmap_array[index_max] = LETHAL_OBSTACLE;
+        // Transform to rolling window frame
+        temp_vector_min = transform * tf::Vector3(add_obs_min_x_, y_iter, 0.0);
+        temp_vector_max = transform * tf::Vector3(add_obs_max_x_, y_iter, 0.0);
+
+        setLethal(master_grid, costmap_array, add_obs_min_x_, y_iter, temp_vector_min);
+        setLethal(master_grid, costmap_array, add_obs_max_x_, y_iter, temp_vector_max);
       }
     }
   }
@@ -298,18 +257,72 @@ void ScientificaDPObstacleLayer::reset()
     current_ = true;
 }
 
-void ScientificaDPObstacleLayer::setParameters
-    (double DP_min_x, double DP_min_y, double DP_max_x, double DP_max_y,
-     double add_obs_min_x, double add_obs_min_y, double add_obs_max_x, double add_obs_max_y)
+bool ScientificaDPObstacleLayer::checkIfInStagingRegion(double &x, double &y)
 {
-  DP_min_x_ = DP_min_x;
-  DP_max_x_ = DP_max_x;
-  DP_min_y_ = DP_min_y;
-  DP_max_y_ = DP_max_y;
-  add_obs_min_x_ = add_obs_min_x;
-  add_obs_max_x_ = add_obs_max_x;
-  add_obs_min_y_ = add_obs_min_y;
-  add_obs_max_y_ = add_obs_max_y;
+  if ((x <= staging_max_x_ && x >= staging_min_x_) &&
+      (y <= staging_max_y_ && y >= staging_min_y_))
+  {
+    return true;
+  }
+  return false;
+}
+
+void ScientificaDPObstacleLayer::setLethal(costmap_2d::Costmap2D& master_grid,
+                                           unsigned char* costmap_array,
+                                           double &x, double &y)
+{
+  if (!checkIfInStagingRegion(x, y))
+  {
+    unsigned int mx, my;
+    // Necessary to compute in two if conditions, otherwhise function not working
+    if (!worldToMap(x, y, mx, my))
+    {
+      ROS_DEBUG("Computing map coords failed");
+    }
+    else
+    {
+      // Set lethal
+      costmap_array[master_grid.getIndex(mx, my)] = LETHAL_OBSTACLE;
+    }
+  }
+}
+
+void ScientificaDPObstacleLayer::setLethal(costmap_2d::Costmap2D& master_grid,
+                                           unsigned char* costmap_array,
+                                           double &x, double &y, tf::Vector3 &vec)
+{
+  if (!checkIfInStagingRegion(x, y))
+  {
+    unsigned int mx, my;
+    // Necessary to compute in two if conditions, otherwhise function not working
+    if (!worldToMap(vec.getX(), vec.getY(), mx, my))
+    {
+      ROS_DEBUG("Computing map coords failed");
+    }
+    else
+    {
+      // Set lethal
+      costmap_array[master_grid.getIndex(mx, my)] = LETHAL_OBSTACLE;
+    }
+  }
+}
+
+
+void ScientificaDPObstacleLayer::setParameters
+    (costmap_2d::ScientificaDPObstaclePluginConfig &config)
+{
+  DP_min_x_ = config.DP_min_x;
+  DP_max_x_ = config.DP_max_x;
+  DP_min_y_ = config.DP_min_y;
+  DP_max_y_ = config.DP_max_y;
+  add_obs_min_x_ = config.add_obs_min_x;
+  add_obs_max_x_ = config.add_obs_max_x;
+  add_obs_min_y_ = config.add_obs_min_y;
+  add_obs_max_y_ = config.add_obs_max_y;
+  staging_min_x_ = config.staging_min_x;
+  staging_max_x_ = config.staging_max_x;
+  staging_min_y_ = config.staging_min_y;
+  staging_max_y_ = config.staging_max_y;
 }
 
 }  // namespace costmap_2d
