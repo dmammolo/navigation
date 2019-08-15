@@ -123,11 +123,6 @@ public:
 protected:
   virtual void setupDynamicReconfigure(ros::NodeHandle& nh);
 
-  std::vector<geometry_msgs::Point> transformed_footprint_;
-  bool footprint_clearing_enabled_;
-  void updateFootprint(double robot_x, double robot_y, double robot_yaw, double* min_x, double* min_y,
-                       double* max_x, double* max_y);
-
   std::string global_frame_;  ///< @brief The global frame for the costmap
 
   std::vector<boost::shared_ptr<message_filters::SubscriberBase> > observation_subscribers_;  ///< @brief Used for the observation message filters

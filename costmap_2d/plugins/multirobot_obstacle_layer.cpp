@@ -131,7 +131,6 @@ MultirobotObstacleLayer::~MultirobotObstacleLayer()
 void MultirobotObstacleLayer::reconfigureCB(costmap_2d::MultirobotObstaclePluginConfig &config, uint32_t level)
 {
   setInflationParameters(config.robot_radius);
-  footprint_clearing_enabled_ = config.footprint_clearing_enabled;
   combination_method_ = config.combination_method;
 
   if (enabled_ != config.enabled) {
@@ -210,6 +209,10 @@ void MultirobotObstacleLayer::updateBounds(double robot_x, double robot_y, doubl
     px = transform.getOrigin().getX();
     py = transform.getOrigin().getY();
 
+    // Check if it is himself. PS TF can have some delay, that's the reason
+    // for checking in this range (<=0.10)
+    if (std::abs(px - robot_x) <= 0.10 && std::abs(py - robot_y) <= 0.10) continue;
+
     // now we need to compute the map coordinates for the observation
     unsigned int mx, my;
     if (!worldToMap(px, py, mx, my))
@@ -227,8 +230,6 @@ void MultirobotObstacleLayer::updateBounds(double robot_x, double robot_y, doubl
 
     touch(px, py, min_x, min_y, max_x, max_y);
   }
-
-  updateFootprint(robot_x, robot_y, robot_yaw, min_x, min_y, max_x, max_y);
 
   if (need_reinflation_)
   {
@@ -260,18 +261,6 @@ void MultirobotObstacleLayer::updateBounds(double robot_x, double robot_y, doubl
     *max_x = std::max(tmp_max_x, *max_x) + robot_radius_;
     *max_y = std::max(tmp_max_y, *max_y) + robot_radius_;
   }
-}
-
-void MultirobotObstacleLayer::updateFootprint(double robot_x, double robot_y, double robot_yaw, double* min_x, double* min_y,
-                                    double* max_x, double* max_y)
-{
-    if (!footprint_clearing_enabled_) return;
-    transformFootprint(robot_x, robot_y, robot_yaw, getFootprint(), transformed_footprint_);
-
-    for (unsigned int i = 0; i < transformed_footprint_.size(); i++)
-    {
-      touch(transformed_footprint_[i].x, transformed_footprint_[i].y, min_x, min_y, max_x, max_y);
-    }
 }
 
 void MultirobotObstacleLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, int min_j, int max_i, int max_j)
@@ -339,12 +328,6 @@ void MultirobotObstacleLayer::updateCosts(costmap_2d::Costmap2D& master_grid, in
       if (my < size_y - 1)
         enqueue(index + size_x, mx, my + 1, sx, sy);
     }
-  }
-
-
-  if (footprint_clearing_enabled_)
-  {
-    setConvexPolygonCost(transformed_footprint_, costmap_2d::FREE_SPACE);
   }
 
   switch (combination_method_)
