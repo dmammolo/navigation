@@ -186,7 +186,9 @@ void MultirobotObstacleLayer::updateBounds(double robot_x, double robot_y, doubl
     ROS_ASSERT_MSG(inflation_cells_rolling_.empty(), "The inflation list must be empty at the beginning of inflation");
   }
 
-  // Set robot cell cost to LETHAL
+  // Iterate through robot_0 to robot_10 and check if there is a tf available.
+  // Currently not a nice solution, but including information, which robot is in
+  // the system would require more engineering time that is currently not available.
   for (int i = 0; i < 10; i++)
   {
     tf::StampedTransform transform;
@@ -205,6 +207,17 @@ void MultirobotObstacleLayer::updateBounds(double robot_x, double robot_y, doubl
       continue;
     }
 
+    // Check if a robot was removed from the system. ros::Time(0) takes the last
+    // available tf, even if this is multiple seconds ago. To overcome this issue
+    // we check that the time stamp is not greater than 0.5 seconds, if it is
+    // we continue with the next robot.
+    ros::Time current_time = ros::Time::now();
+    if(current_time.toSec() - transform.stamp_.toSec() > 0.5)
+    {
+      continue;
+    }
+
+    // Get x and y position from tf
     double px, py;
     px = transform.getOrigin().getX();
     py = transform.getOrigin().getY();
